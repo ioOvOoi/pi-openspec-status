@@ -59,7 +59,7 @@ export function progressBar(theme: Theme, completed: number, total: number): str
  * Render artifact portion for multi-change mode or preview.
  * When useFullNames is true, shows full artifact names; otherwise uses initials.
  */
-export function renderArtifactPart(theme: Theme, detail: ChangeDetail, useFullNames: boolean): string {
+	return detail.artifacts
 		.map((a) => {
 			const rawLabel = useFullNames ? a.id : a.id.charAt(0).toUpperCase();
 			const label = artifactLabel(rawLabel);
