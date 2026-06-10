@@ -6,6 +6,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ChangeSummary, ChangeDetail, TaskGroup } from "./types.ts";
 import { parseTaskGroups } from "./tasks-parser.ts";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { execSync } from "node:child_process";
 
 /**
  * Result of a CLI availability check.
@@ -38,13 +41,8 @@ let _openSpecDir: string | null | undefined = undefined;
  */
 export async function resolveOpenSpecDir(pi: ExtensionAPI): Promise<string | null> {
 	// Step 1: Check current working directory
-	try {
-		const cwdResult = await pi.exec("test", ["-d", "openspec/changes"], { timeout: 5000 });
-		if (cwdResult.code === 0) {
-			return process.cwd();
-		}
-	} catch {
-		// test command failed (unlikely), continue to git fallback
+	if (existsSync(join(process.cwd(), "openspec", "changes"))) {
+		return process.cwd();
 	}
 
 	// Step 2: Git root fallback
@@ -52,12 +50,8 @@ export async function resolveOpenSpecDir(pi: ExtensionAPI): Promise<string | nul
 		const gitResult = await pi.exec("git", ["rev-parse", "--show-toplevel"], { timeout: 5000 });
 		if (gitResult.code === 0) {
 			const gitRoot = gitResult.stdout?.trim();
-			if (gitRoot) {
-				// Validate that openspec/changes exists at the git root
-				const gitCheckResult = await pi.exec("test", ["-d", `${gitRoot}/openspec/changes`], { timeout: 5000 });
-				if (gitCheckResult.code === 0) {
-					return gitRoot;
-				}
+			if (gitRoot && existsSync(join(gitRoot, "openspec", "changes"))) {
+				return gitRoot;
 			}
 		}
 	} catch {
@@ -94,17 +88,15 @@ export function resetOpenSpecDir(): void {
 
 // ── CLI check ─────────────────────────────────────────────────────────
 
+// On Windows, use openspec.cmd (PATHEXT may not resolve the shell script)
+const OPENSPEC_CMD = process.platform === "win32" ? "openspec.cmd" : "openspec";
+
 /**
  * Check if the `openspec` CLI is available on PATH.
  */
-export async function checkCliAvailable(pi: ExtensionAPI): Promise<CliCheckResult> {
+export async function checkCliAvailable(_pi: ExtensionAPI): Promise<CliCheckResult> {
 	try {
-		const result = await pi.exec("openspec", ["--help"], {
-			timeout: 5000,
-		});
-		if (result.code !== 0) {
-			return { available: false, reason: result.stderr?.trim() || "CLI returned non-zero exit code" };
-		}
+		execSync(`${OPENSPEC_CMD} --help`, { timeout: 5000, stdio: "pipe" });
 		return { available: true };
 	} catch (err) {
 		return { available: false, reason: err instanceof Error ? err.message : String(err) };
@@ -120,24 +112,21 @@ export async function checkCliAvailable(pi: ExtensionAPI): Promise<CliCheckResul
  * @param cwd - Optional working directory. If provided, the CLI runs from this directory.
  */
 async function execOpenSpecJson<T>(
-	pi: ExtensionAPI,
+	_pi: ExtensionAPI,
 	args: string[],
 	errorLabel: string,
 	cwd?: string,
 ): Promise<{ data: T | null; error: string | null }> {
 	try {
-		const result = await pi.exec("openspec", args, {
+		const cmd = `${OPENSPEC_CMD} ${args.join(" ")}`;
+		const result = execSync(cmd, {
 			timeout: 10000,
 			...(cwd ? { cwd } : {}),
+			encoding: "utf-8",
+			stdio: "pipe",
 		});
 
-		if (result.code !== 0) {
-			const errMsg = result.stderr?.trim() || `exit code ${result.code}`;
-			return { data: null, error: `${errorLabel}: ${errMsg}` };
-		}
-
-		// stdout may contain ANSI or extra output; try to find JSON payload
-		const stdout = result.stdout?.trim() || "";
+		const stdout = result?.trim() || "";
 		// Try parsing entire output as JSON first
 		try {
 			const parsed = JSON.parse(stdout) as T;
@@ -227,13 +216,13 @@ export async function fetchTaskGroups(
 ): Promise<TaskGroup[]> {
 	try {
 		const dir = await getOpenSpecDir(pi);
-		const filePath = `openspec/changes/${changeName}/tasks.md`;
-		const result = await pi.exec("cat", [filePath], { timeout: 5000, cwd: dir ?? undefined });
+		const fullPath = join(dir ?? process.cwd(), "openspec", "changes", changeName, "tasks.md");
+		if (!existsSync(fullPath)) return [];
 
-		if (result.code !== 0) return [];
-		if (!result.stdout?.trim()) return [];
+		const content = readFileSync(fullPath, "utf-8");
+		if (!content.trim()) return [];
 
-		return parseTaskGroups(result.stdout);
+		return parseTaskGroups(content);
 	} catch {
 		return [];
 	}
