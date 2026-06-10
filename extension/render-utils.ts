@@ -60,11 +60,30 @@ export function progressBar(theme: Theme, completed: number, total: number): str
  * When useFullNames is true, shows full artifact names; otherwise uses initials.
  */
 export function renderArtifactPart(theme: Theme, detail: ChangeDetail, useFullNames: boolean): string {
-	return detail.artifacts
 		.map((a) => {
-			const label = useFullNames ? a.id : a.id.charAt(0).toUpperCase();
+			const rawLabel = useFullNames ? a.id : a.id.charAt(0).toUpperCase();
+			const label = artifactLabel(rawLabel);
 			const icon = artifactIcon(theme, a.status as "done" | "ready" | "blocked");
 			return `${label} ${icon}`;
 		})
 		.join("   ");
+}
+
+/**
+ * Translate artifact/schema names to Chinese.
+ */
+const LABELS: Record<string, string> = {
+	proposal: "提案",
+	design: "设计",
+	specs: "规格",
+	tasks: "任务",
+	"spec-driven": "规格驱动",
+};
+
+export function artifactLabel(id: string): string {
+	return LABELS[id] ?? id;
+}
+
+export function schemaLabel(name: string): string {
+	return LABELS[name] ?? name;
 }

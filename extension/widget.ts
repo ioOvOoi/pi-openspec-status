@@ -13,6 +13,8 @@ import {
 	changeStatusIcon,
 	renderArtifactPart,
 	progressBar,
+	artifactLabel,
+	schemaLabel,
 } from "./render-utils.ts";
 
 /**
@@ -54,7 +56,7 @@ export function renderSingleChange(
 
 	// Line 1: Status icon + change name + schema
 	const statusIcon = changeStatusIcon(theme, change, detail);
-	const nameLine = `${statusIcon} ${theme.fg("text", change.name)} ${theme.fg("muted", `(${detail.schemaName})`)}`;
+	const nameLine = `${statusIcon} ${theme.fg("text", change.name)} ${theme.fg("muted", `(${schemaLabel(detail.schemaName)})`)}`;
 	lines.push(truncateToWidth(nameLine, availableWidth, "…"));
 
 	// Line 2: Artifact statuses (full names or initials + colored icon)

@@ -12,6 +12,7 @@ import {
 	changeStatusIcon,
 	renderArtifactPart,
 	progressBar,
+	schemaLabel,
 } from "./render-utils.ts";
 
 // ── OpenSpecOverlay Component ──────────────────────────────────────────────────
@@ -46,10 +47,8 @@ export class OpenSpecOverlay {
 		this.onAction = onAction;
 		this.error = error;
 		this.hasVerify = hasVerify;
-		this.selectedIndex = changes.length > 1 ? 0 : 0; // Pre-select first change
+		this.selectedIndex = changes.length > 1 ? 0 : 0;
 	}
-
-	// ── Input handling ───────────────────────────────────────────────────────
 
 	handleInput(data: string): void {
 		if (matchesKey(data, Key.up)) {
@@ -77,8 +76,6 @@ export class OpenSpecOverlay {
 		}
 	}
 
-	// ── Rendering ────────────────────────────────────────────────────────────
-
 	render(width: number): string[] {
 		if (this.cachedLines && this.cachedWidth === width) {
 			return this.cachedLines;
@@ -88,7 +85,6 @@ export class OpenSpecOverlay {
 		const innerW = Math.max(1, width - 2);
 		const lines: string[] = [];
 
-		// Top border with title
 		lines.push(this.renderTopBorder(innerW, th));
 
 		if (this.error && this.changes.length === 0) {
@@ -97,13 +93,11 @@ export class OpenSpecOverlay {
 			lines.push(this.renderLine(th.fg("muted", "暂无活跃 OpenSpec 变更"), innerW, th));
 			lines.push(this.renderLine("", innerW, th));
 		} else {
-			// Change list section
 			lines.push(this.renderLine(th.fg("muted", " 变更"), innerW, th));
 			for (let i = 0; i < this.changes.length; i++) {
 				lines.push(this.renderChangeRow(i, innerW, th));
 			}
 
-			// Preview pane for selected change
 			const selectedChange = this.changes[this.selectedIndex];
 			const selectedDetail = selectedChange ? this.details.get(selectedChange.name) : undefined;
 			if (selectedChange && selectedDetail) {
@@ -113,11 +107,9 @@ export class OpenSpecOverlay {
 			}
 		}
 
-		// Action hint bar
 		lines.push(this.renderLine("", innerW, th));
 		lines.push(this.renderLine(this.renderHintBar(th), innerW, th));
 
-		// Bottom border
 		lines.push(th.fg("border", `╰${"─".repeat(innerW)}╯`));
 
 		this.cachedLines = lines;
@@ -129,8 +121,6 @@ export class OpenSpecOverlay {
 		this.cachedWidth = undefined;
 		this.cachedLines = undefined;
 	}
-
-	// ── Render helpers ───────────────────────────────────────────────────────
 
 	private renderTopBorder(innerW: number, th: Theme): string {
 		const title = "OpenSpec 操作";
@@ -183,19 +173,17 @@ export class OpenSpecOverlay {
 		const lines: string[] = [];
 
 		const statusIcon = changeStatusIcon(th, change, detail);
-		const nameLine = `${statusIcon} ${th.fg("text", change.name)} ${th.fg("muted", `(${detail.schemaName})`)}`;
+		const nameLine = `${statusIcon} ${th.fg("text", change.name)} ${th.fg("muted", `(${schemaLabel(detail.schemaName)})`)}`;
 		lines.push(this.renderLine(nameLine, innerW, th));
 
 		const artifactStr = renderArtifactPart(th, detail, true);
 		lines.push(this.renderLine(th.fg("muted", "工件: ") + artifactStr, innerW, th));
 
-		// Check for task group data; if present and non-empty, render groups
 		const groups = this.taskGroups.get(change.name);
 		if (groups && groups.length > 0) {
 			lines.push(this.renderLine(th.fg("muted", "任务:"), innerW, th));
 			lines.push(...this.renderTaskGroups(th, groups, innerW));
 		} else {
-			// Flat fallback: progress bar with no apply suffix
 			const taskBar = progressBar(th, change.completedTasks, change.totalTasks);
 			lines.push(this.renderLine(th.fg("muted", "任务: ") + taskBar, innerW, th));
 		}
@@ -203,9 +191,6 @@ export class OpenSpecOverlay {
 		return lines;
 	}
 
-	/**
-	 * Render task group breakdown lines for the overlay preview pane.
-	 */
 	private renderTaskGroups(th: Theme, groups: TaskGroup[], innerW: number): string[] {
 		const lines: string[] = [];
 
@@ -233,7 +218,6 @@ export class OpenSpecOverlay {
 				counter = th.fg("text", `${group.completed}/${group.total}`);
 			}
 
-			// Truncate group name to fit the available width
 			const line = `  ${icon} ${group.name}: ${counter}`;
 			lines.push(this.renderLine(line, innerW, th));
 		}
