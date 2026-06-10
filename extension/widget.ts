@@ -28,7 +28,7 @@ function shouldUseFullNames(
 ): boolean {
 	if (isSingleChange) {
 		const artifactStr = renderArtifactPart(theme, detail, true);
-		const line = `Artifacts: ${artifactStr}`;
+		const line = `工件: ${artifactStr}`;
 		return visibleWidth(line) <= availableWidth;
 	} else {
 		const statusIcon = changeStatusIcon(theme, change, detail);
@@ -59,11 +59,11 @@ export function renderSingleChange(
 
 	// Line 2: Artifact statuses (full names or initials + colored icon)
 	const artifactStr = renderArtifactPart(theme, detail, useFullNames);
-	lines.push(truncateToWidth(theme.fg("muted", "Artifacts: ") + artifactStr, availableWidth, "…"));
+	lines.push(truncateToWidth(theme.fg("muted", "工件: ") + artifactStr, availableWidth, "…"));
 
 	// Line 3: Task progress bar (no apply suffix)
 	const taskBar = progressBar(theme, change.completedTasks, change.totalTasks);
-	lines.push(truncateToWidth(`${theme.fg("muted", "Tasks: ")}${taskBar}`, availableWidth, "…"));
+	lines.push(truncateToWidth(`${theme.fg("muted", "任务: ")}${taskBar}`, availableWidth, "…"));
 
 	return lines;
 }
@@ -80,7 +80,7 @@ export function renderMultiChange(
 	const lines: string[] = [];
 
 	// Header line
-	lines.push(theme.fg("accent", `OpenSpec (${changes.length} active)`));
+	lines.push(theme.fg("accent", `OpenSpec (${changes.length} 活跃)`));
 
 	for (const change of changes) {
 		const detail = details.get(change.name);
@@ -105,7 +105,7 @@ export function renderMultiChange(
 		if (detail && !detail.isComplete) {
 			const blockedArtifacts = detail.artifacts.filter((a) => a.status === "blocked");
 			if (blockedArtifacts.length > 0) {
-				blockedHint = ` ${theme.fg("warning", `(blocked: ${blockedArtifacts.map((a) => a.id).join(", ")})`)}`;
+				blockedHint = ` ${theme.fg("warning", `(等待: ${blockedArtifacts.map((a) => a.id).join(", ")})`)}`;
 			}
 		}
 
@@ -120,7 +120,7 @@ export function renderMultiChange(
  * Render the "no changes" message.
  */
 export function renderNoChanges(theme: Theme): string[] {
-	return [theme.fg("muted", "No active OpenSpec changes")];
+	return [theme.fg("muted", "暂无活跃 OpenSpec 变更")];
 }
 
 /**

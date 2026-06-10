@@ -3,10 +3,6 @@
  *
  * Self-contained TUI components for the interactive overlay.
  * Each component exposes render(), handleInput(), invalidate() for use with ctx.ui.custom().
- *
- * Dependencies:
- *   - render-utils.ts for shared rendering primitives
- *   - @earendil-works/pi-tui for input handling and text utilities
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
@@ -98,11 +94,11 @@ export class OpenSpecOverlay {
 		if (this.error && this.changes.length === 0) {
 			lines.push(this.renderLine(th.fg("warning", `⚠ ${this.error}`), innerW, th));
 		} else if (this.changes.length === 0) {
-			lines.push(this.renderLine(th.fg("muted", "No active OpenSpec changes"), innerW, th));
+			lines.push(this.renderLine(th.fg("muted", "暂无活跃 OpenSpec 变更"), innerW, th));
 			lines.push(this.renderLine("", innerW, th));
 		} else {
 			// Change list section
-			lines.push(this.renderLine(th.fg("muted", " Changes"), innerW, th));
+			lines.push(this.renderLine(th.fg("muted", " 变更"), innerW, th));
 			for (let i = 0; i < this.changes.length; i++) {
 				lines.push(this.renderChangeRow(i, innerW, th));
 			}
@@ -112,7 +108,7 @@ export class OpenSpecOverlay {
 			const selectedDetail = selectedChange ? this.details.get(selectedChange.name) : undefined;
 			if (selectedChange && selectedDetail) {
 				lines.push(this.renderLine("", innerW, th));
-				lines.push(this.renderLine(th.fg("muted", " Preview"), innerW, th));
+				lines.push(this.renderLine(th.fg("muted", " 预览"), innerW, th));
 				lines.push(...this.renderPreviewPane(selectedChange, selectedDetail, innerW, th));
 			}
 		}
@@ -137,7 +133,7 @@ export class OpenSpecOverlay {
 	// ── Render helpers ───────────────────────────────────────────────────────
 
 	private renderTopBorder(innerW: number, th: Theme): string {
-		const title = "OpenSpec Actions";
+		const title = "OpenSpec 操作";
 		const titleStr = truncateToWidth(` ${title} `, innerW);
 		const titleW = visibleWidth(titleStr);
 		const leftDash = Math.floor((innerW - titleW) / 2);
@@ -175,7 +171,7 @@ export class OpenSpecOverlay {
 		if (detail && !detail.isComplete) {
 			const blockedArtifacts = detail.artifacts.filter((a) => a.status === "blocked");
 			if (blockedArtifacts.length > 0) {
-				blockedHint = ` ${th.fg("warning", `(blocked: ${blockedArtifacts.map((a) => a.id).join(", ")})`)}`;
+				blockedHint = ` ${th.fg("warning", `(等待: ${blockedArtifacts.map((a) => a.id).join(", ")})`)}`;
 			}
 		}
 
@@ -191,17 +187,17 @@ export class OpenSpecOverlay {
 		lines.push(this.renderLine(nameLine, innerW, th));
 
 		const artifactStr = renderArtifactPart(th, detail, true);
-		lines.push(this.renderLine(th.fg("muted", "Artifacts: ") + artifactStr, innerW, th));
+		lines.push(this.renderLine(th.fg("muted", "工件: ") + artifactStr, innerW, th));
 
 		// Check for task group data; if present and non-empty, render groups
 		const groups = this.taskGroups.get(change.name);
 		if (groups && groups.length > 0) {
-			lines.push(this.renderLine(th.fg("muted", "Tasks:"), innerW, th));
+			lines.push(this.renderLine(th.fg("muted", "任务:"), innerW, th));
 			lines.push(...this.renderTaskGroups(th, groups, innerW));
 		} else {
 			// Flat fallback: progress bar with no apply suffix
 			const taskBar = progressBar(th, change.completedTasks, change.totalTasks);
-			lines.push(this.renderLine(th.fg("muted", "Tasks: ") + taskBar, innerW, th));
+			lines.push(this.renderLine(th.fg("muted", "任务: ") + taskBar, innerW, th));
 		}
 
 		return lines;
@@ -209,7 +205,6 @@ export class OpenSpecOverlay {
 
 	/**
 	 * Render task group breakdown lines for the overlay preview pane.
-	 * Each group is rendered on its own line with a status icon and progress counter.
 	 */
 	private renderTaskGroups(th: Theme, groups: TaskGroup[], innerW: number): string[] {
 		const lines: string[] = [];
@@ -233,7 +228,7 @@ export class OpenSpecOverlay {
 
 			let counter: string;
 			if (group.status === "empty") {
-				counter = th.fg("muted", "— no tasks");
+				counter = th.fg("muted", "— 无任务");
 			} else {
 				counter = th.fg("text", `${group.completed}/${group.total}`);
 			}
@@ -251,21 +246,21 @@ export class OpenSpecOverlay {
 		const parts: string[] = [];
 
 		if (hasChanges) {
-			parts.push(th.fg("accent", "a") + th.fg("dim", " apply"));
+			parts.push(th.fg("accent", "a") + th.fg("dim", " 实施"));
 			if (this.hasVerify) {
-				parts.push(th.fg("accent", "v") + th.fg("dim", " verify"));
+				parts.push(th.fg("accent", "v") + th.fg("dim", " 验证"));
 			}
-			parts.push(th.fg("accent", "e") + th.fg("dim", " explore"));
-			parts.push(th.fg("accent", "c") + th.fg("dim", " archive"));
+			parts.push(th.fg("accent", "e") + th.fg("dim", " 探索"));
+			parts.push(th.fg("accent", "c") + th.fg("dim", " 归档"));
 		} else {
-			const mutedActions = ["a apply", "e explore", "c archive"];
+			const mutedActions = ["a 实施", "e 探索", "c 归档"];
 			if (this.hasVerify) {
-				mutedActions.splice(1, 0, "v verify");
+				mutedActions.splice(1, 0, "v 验证");
 			}
 			parts.push(th.fg("muted", mutedActions.join(" · ")));
 		}
-		parts.push(th.fg("accent", "p") + th.fg("dim", " propose new"));
-		parts.push(th.fg("accent", "esc") + th.fg("dim", " cancel"));
+		parts.push(th.fg("accent", "p") + th.fg("dim", " 新建提案"));
+		parts.push(th.fg("accent", "esc") + th.fg("dim", " 取消"));
 
 		return parts.join(th.fg("dim", " · "));
 	}
@@ -273,10 +268,6 @@ export class OpenSpecOverlay {
 
 // ── LoadingOverlay Component ────────────────────────────────────────────────────
 
-/**
- * Lightweight loading overlay with animated spinner and box-drawing borders
- * that match the OpenSpecOverlay visual style.
- */
 export class LoadingOverlay {
 	private tui: TUI;
 	private theme: Theme;
@@ -331,19 +322,12 @@ export class LoadingOverlay {
 
 		const lines: string[] = [];
 
-		// Top border — full width, all border color
 		lines.push(th.fg("border", "╭" + "─".repeat(innerW) + "╮"));
-		// Empty line
 		lines.push(th.fg("border", "│") + truncateToWidth("", innerW, "…", true) + th.fg("border", "│"));
-		// Spinner + message
 		lines.push(th.fg("border", "│") + truncateToWidth(` ${th.fg("accent", spin)} ${this.message}`, innerW, "…", true) + th.fg("border", "│"));
-		// Empty line
 		lines.push(th.fg("border", "│") + truncateToWidth("", innerW, "…", true) + th.fg("border", "│"));
-		// Cancel hint
-		lines.push(th.fg("border", "│") + truncateToWidth(th.fg("dim", " esc cancel"), innerW, "…", true) + th.fg("border", "│"));
-		// Empty line
+		lines.push(th.fg("border", "│") + truncateToWidth(th.fg("dim", " esc 取消"), innerW, "…", true) + th.fg("border", "│"));
 		lines.push(th.fg("border", "│") + truncateToWidth("", innerW, "…", true) + th.fg("border", "│"));
-		// Bottom border — full width, all border color
 		lines.push(th.fg("border", "╰" + "─".repeat(innerW) + "╯"));
 
 		this.cachedLines = lines;
