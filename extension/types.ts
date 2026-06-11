@@ -43,6 +43,15 @@ export interface WidgetState {
 	lastRefresh: number;
 }
 
+/** The build/opsx mode */
+export type OpenSpecMode = "build" | "opsx";
+
+/** Configuration persisted to ~/.pi/agent/openspec-mode.json */
+export interface ModeConfig {
+	defaultMode: OpenSpecMode;
+	projects: Record<string, OpenSpecMode>;
+}
+
 /** Action dispatched from the interactive overlay to the shortcut handler */
 export type OverlayAction =
 	| { type: "apply"; changeName: string }
@@ -50,4 +59,5 @@ export type OverlayAction =
 	| { type: "explore"; changeName: string }
 	| { type: "archive"; changeName: string }
 	| { type: "propose" }
+	| { type: "mode-toggle" }
 	| { type: "cancel" };

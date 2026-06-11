@@ -1,6 +1,6 @@
 /**
  * Mode state management for the OpenSpec extension.
- * 
+ *
  * Manages build/opsx mode toggle with lightweight persistence
  * to ~/.pi/agent/openspec-mode.json.
  */
@@ -89,7 +89,8 @@ export function registerModeCommands(
 	onModeChange: (mode: OpenSpecMode) => void,
 ): void {
 	pi.registerCommand("opsx", {
-		description: "Switch to OPSX mode (strict OpenSpec workflow 严格 OpenSpec 模式)",
+		description:
+			"Switch to OPSX mode (strict OpenSpec workflow 严格 OpenSpec 模式)",
 		handler: async (_args, ctx) => {
 			setMode("opsx", projectPath);
 			if (ctx.hasUI) {

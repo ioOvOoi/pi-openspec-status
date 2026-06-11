@@ -6,17 +6,19 @@
  * width-adaptive.
  */
 
-import type { ChangeSummary, ChangeDetail } from "./types.ts";
+import type { ChangeSummary, ChangeDetail, OpenSpecMode } from "./types.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
 	changeStatusIcon,
 	renderArtifactPart,
 	progressBar,
-	artifactLabel,
-	schemaLabel,
 } from "./render-utils.ts";
-
+import {
+	renderCorePipeline,
+	renderExpandedPipeline,
+	inferStageIndex,
+} from "./pipeline.ts";
 /**
  * Determine whether full artifact names can fit in the available width.
  * Try rendering mock lines with full names; if they exceed width, use initials.
@@ -50,22 +52,51 @@ export function renderSingleChange(
 	change: ChangeSummary,
 	detail: ChangeDetail,
 	availableWidth: number,
+	mode: OpenSpecMode = "build",
 ): string[] {
 	const lines: string[] = [];
-	const useFullNames = shouldUseFullNames(theme, change, detail, availableWidth, true);
+	const useFullNames = shouldUseFullNames(
+		theme,
+		change,
+		detail,
+		availableWidth,
+		true,
+	);
 
 	// Line 1: Status icon + change name + schema
 	const statusIcon = changeStatusIcon(theme, change, detail);
-	const nameLine = `${statusIcon} ${theme.fg("text", change.name)} ${theme.fg("muted", `(${schemaLabel(detail.schemaName)})`)}`;
+	const nameLine = `${statusIcon} ${theme.fg("text", change.name)} ${theme.fg("muted", `(${detail.schemaName})`)}`;
 	lines.push(truncateToWidth(nameLine, availableWidth, "…"));
 
 	// Line 2: Artifact statuses (full names or initials + colored icon)
 	const artifactStr = renderArtifactPart(theme, detail, useFullNames);
-	lines.push(truncateToWidth(theme.fg("muted", "工件: ") + artifactStr, availableWidth, "…"));
+	lines.push(
+		truncateToWidth(
+			theme.fg("muted", "工件: ") + artifactStr,
+			availableWidth,
+			"…",
+		),
+	);
 
 	// Line 3: Task progress bar (no apply suffix)
 	const taskBar = progressBar(theme, change.completedTasks, change.totalTasks);
-	lines.push(truncateToWidth(`${theme.fg("muted", "任务: ")}${taskBar}`, availableWidth, "…"));
+	lines.push(
+		truncateToWidth(
+			`${theme.fg("muted", "任务: ")}${taskBar}`,
+			availableWidth,
+			"…",
+		),
+	);
+
+	// Lines 4-5: Pipeline display (opsx mode only)
+	if (mode === "opsx") {
+		const stageIndex = inferStageIndex(detail.artifacts);
+		const coreLine = renderCorePipeline(theme, stageIndex, availableWidth);
+		lines.push(truncateToWidth(coreLine, availableWidth, "…"));
+
+		const expandedLine = renderExpandedPipeline(theme, availableWidth);
+		lines.push(truncateToWidth(expandedLine, availableWidth, "…"));
+	}
 
 	return lines;
 }
@@ -95,17 +126,28 @@ export function renderMultiChange(
 		// Artifact portion: use full names if width permits, initials otherwise
 		let artifactPart = "";
 		if (detail) {
-			const useFullNames = shouldUseFullNames(theme, change, detail, availableWidth, false);
+			const useFullNames = shouldUseFullNames(
+				theme,
+				change,
+				detail,
+				availableWidth,
+				false,
+			);
 			artifactPart = renderArtifactPart(theme, detail, useFullNames);
 		}
 
 		// Task counter
-		const taskCounter = theme.fg("text", `${change.completedTasks}/${change.totalTasks}`);
+		const taskCounter = theme.fg(
+			"text",
+			`${change.completedTasks}/${change.totalTasks}`,
+		);
 
 		// Blocked dependency hint
 		let blockedHint = "";
 		if (detail && !detail.isComplete) {
-			const blockedArtifacts = detail.artifacts.filter((a) => a.status === "blocked");
+			const blockedArtifacts = detail.artifacts.filter(
+				(a) => a.status === "blocked",
+			);
 			if (blockedArtifacts.length > 0) {
 				blockedHint = ` ${theme.fg("warning", `(等待: ${blockedArtifacts.map((a) => a.id).join(", ")})`)}`;
 			}
@@ -128,7 +170,11 @@ export function renderNoChanges(theme: Theme): string[] {
 /**
  * Render an error state.
  */
-export function renderError(theme: Theme, message: string, availableWidth: number): string[] {
+export function renderError(
+	theme: Theme,
+	message: string,
+	availableWidth: number,
+): string[] {
 	const line = theme.fg("warning", `⚠ ${message}`);
 	return [truncateToWidth(line, availableWidth, "…")];
 }
@@ -142,6 +188,7 @@ export function renderWidget(
 	details: Map<string, ChangeDetail>,
 	error: string | null,
 	availableWidth: number,
+	mode: OpenSpecMode = "build",
 ): string[] {
 	if (error && changes.length === 0) {
 		return renderError(theme, error, availableWidth);
@@ -154,11 +201,27 @@ export function renderWidget(
 	if (changes.length === 1) {
 		const detail = details.get(changes[0]!.name);
 		if (detail) {
-			return renderSingleChange(theme, changes[0]!, detail, availableWidth);
+			return renderSingleChange(
+				theme,
+				changes[0]!,
+				detail,
+				availableWidth,
+				mode,
+			);
 		}
 		// Fall back to multi-change style for single change without detail
 		return renderMultiChange(theme, changes, details, availableWidth);
 	}
 
 	return renderMultiChange(theme, changes, details, availableWidth);
+}
+
+/**
+ * Render widget title line with mode badge.
+ */
+export function renderModeBadge(theme: Theme, mode: OpenSpecMode): string {
+	if (mode === "opsx") {
+		return theme.fg("accent", "[OPSX]");
+	}
+	return theme.fg("muted", "[BUILD]");
 }

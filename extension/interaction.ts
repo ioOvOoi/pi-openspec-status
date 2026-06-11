@@ -9,6 +9,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import type { ChangeSummary, ChangeDetail, OverlayAction } from "./types.ts";
+import { getMode, setMode } from "./mode.ts";
 import { fetchActiveChanges } from "./openspec.ts";
 import { LoadingOverlay, OpenSpecOverlay } from "./overlay.ts";
 
@@ -21,7 +22,10 @@ export function registerInteractionShortcut(pi: ExtensionAPI): void {
 		handler: async (ctx) => {
 			// Idle check
 			if (!ctx.isIdle()) {
-				ctx.ui.notify("OpenSpec overlay unavailable: agent is currently processing", "warning");
+				ctx.ui.notify(
+					"OpenSpec overlay unavailable: agent is currently processing",
+					"warning",
+				);
 				return;
 			}
 
@@ -33,7 +37,11 @@ export function registerInteractionShortcut(pi: ExtensionAPI): void {
 				error: string | null;
 			} | null>(
 				(tui, theme, _kb, done) => {
-					const loader = new LoadingOverlay(tui, theme, "Loading OpenSpec changes...");
+					const loader = new LoadingOverlay(
+						tui,
+						theme,
+						"Loading OpenSpec changes...",
+					);
 					loader.onAbort = () => done(null);
 
 					fetchActiveChanges(pi)
@@ -62,7 +70,17 @@ export function registerInteractionShortcut(pi: ExtensionAPI): void {
 			// Open the change list overlay
 			const actionResult = await ctx.ui.custom<OverlayAction | null>(
 				(_tui, theme, _kb, done) => {
-					const overlay = new OpenSpecOverlay(changes, details, taskGroups, theme, (action) => done(action), error, hasVerify);
+					const currentMode = getMode();
+					const overlay = new OpenSpecOverlay(
+						changes,
+						details,
+						taskGroups,
+						theme,
+						(action) => done(action),
+						error,
+						hasVerify,
+						currentMode,
+					);
 					return {
 						render: (w) => overlay.render(w),
 						handleInput: (data) => {
@@ -94,6 +112,13 @@ export function registerInteractionShortcut(pi: ExtensionAPI): void {
 				case "propose":
 					ctx.ui.setEditorText("/opsx-propose ");
 					break;
+				case "mode-toggle": {
+					const newMode = getMode() === "opsx" ? "build" : "opsx";
+					setMode(newMode, process.cwd());
+					const label = newMode === "opsx" ? "OPSX" : "BUILD";
+					ctx.ui.notify(`Mode switched: ${label} 模式已切换: ${label}`, "info");
+					break;
+				}
 				case "cancel":
 					// No editor change, just close
 					break;

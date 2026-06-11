@@ -14,6 +14,8 @@ import { fetchActiveChanges, checkCliAvailable } from "./openspec.ts";
 import { renderWidget } from "./widget.ts";
 import { registerInteractionShortcut } from "./interaction.ts";
 import { debounce, arraysEqual } from "./utils.ts";
+import { registerHooks, setHookStateProviders } from "./hooks.ts";
+import { registerModeCommands, restoreMode, getMode } from "./mode.ts";
 
 export default function (pi: ExtensionAPI) {
 	// ── State ──────────────────────────────────────────────────────────
@@ -26,6 +28,29 @@ export default function (pi: ExtensionAPI) {
 		error: null,
 		lastRefresh: 0,
 	};
+
+	// ── Mode & Hooks ───────────────────────────────────────────────────
+	// Store last widget context for immediate refresh on mode change
+	let widgetCtx:
+		| import("@earendil-works/pi-coding-agent").ExtensionContext
+		| null = null;
+
+	restoreMode(process.cwd());
+	registerModeCommands(pi, process.cwd(), () => {
+		if (widgetCtx) updateWidget(widgetCtx);
+	});
+	registerHooks(pi);
+
+	// Wire hooks to access current state
+	setHookStateProviders(
+		() => getMode(),
+		() => {
+			if (state.changes.length === 0) return null;
+			const detail = state.details.get(state.changes[0]!.name);
+			if (!detail) return null;
+			return { name: state.changes[0]!.name, artifacts: detail.artifacts };
+		},
+	);
 
 	// Cached rendered lines to avoid unnecessary widget updates
 	let cachedLines: string[] | null = null;
@@ -56,7 +81,10 @@ export default function (pi: ExtensionAPI) {
 	/**
 	 * Fetch active changes and update the widget.
 	 */
-	async function refresh(ctx: import("@earendil-works/pi-coding-agent").ExtensionContext, gen?: number): Promise<void> {
+	async function refresh(
+		ctx: import("@earendil-works/pi-coding-agent").ExtensionContext,
+		gen?: number,
+	): Promise<void> {
 		if (!ctx.hasUI) return;
 		if (!cliAvailable) {
 			// Show CLI not found message once
@@ -71,7 +99,8 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		const { changes, details, taskGroups, error } = await fetchActiveChanges(pi);
+		const { changes, details, taskGroups, error } =
+			await fetchActiveChanges(pi);
 		// Bail if the session was replaced while awaiting the CLI data.
 		// `gen` is passed by callers from session_start's async IIFE /
 		// interval. Event handlers (turn_end, etc.) pass no gen since
@@ -94,16 +123,30 @@ export default function (pi: ExtensionAPI) {
 	/**
 	 * Render the widget and update the TUI if content changed.
 	 */
-	function updateWidget(ctx: import("@earendil-works/pi-coding-agent").ExtensionContext): void {
+	function updateWidget(
+		ctx: import("@earendil-works/pi-coding-agent").ExtensionContext,
+	): void {
+		widgetCtx = ctx;
 		if (!ctx.hasUI) return;
 
 		const theme = ctx.ui.theme;
 		const width = getTerminalWidth();
 
-		const newLines = renderWidget(theme, state.changes, state.details, state.error, width);
+		const newLines = renderWidget(
+			theme,
+			state.changes,
+			state.details,
+			state.error,
+			width,
+			getMode(),
+		);
 
 		// Cache: only update widget if content actually changed
-		if (cachedLines !== null && cachedWidth === width && arraysEqual(cachedLines, newLines)) {
+		if (
+			cachedLines !== null &&
+			cachedWidth === width &&
+			arraysEqual(cachedLines, newLines)
+		) {
 			return;
 		}
 
@@ -123,10 +166,16 @@ export default function (pi: ExtensionAPI) {
 	);
 
 	// ── Tool result handler: check for openspec-related changes ───────
-	function isOpenSpecRelated(toolName: string, input: Record<string, unknown>): boolean {
+	function isOpenSpecRelated(
+		toolName: string,
+		input: Record<string, unknown>,
+	): boolean {
 		if (toolName === "write" || toolName === "edit") {
 			const path = input.path as string | undefined;
-			if (path && (path.startsWith("openspec/") || path.includes("/openspec/"))) {
+			if (
+				path &&
+				(path.startsWith("openspec/") || path.includes("/openspec/"))
+			) {
 				return true;
 			}
 		}
@@ -231,7 +280,9 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_result", async (event, ctx) => {
 		if (!ctx.hasUI) return;
 		if (!cliAvailable && cliChecked) return;
-		if (isOpenSpecRelated(event.toolName, event.input as Record<string, unknown>)) {
+		if (
+			isOpenSpecRelated(event.toolName, event.input as Record<string, unknown>)
+		) {
 			debouncedRefresh(ctx);
 		}
 	});
